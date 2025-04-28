@@ -20,7 +20,7 @@ async def get_chat_page(request: Request):
 @app.post("/chat")
 async def chat_with_bot(user_input: UserInput):
     try:
-        response = await get_chatbot_response(user_input.query)
+        response = get_chatbot_response(user_input.query)
         return {"response": response}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
