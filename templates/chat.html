@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>Chat with CLOVA X</title>
+  <title>Chat with My Chatbot</title>
   <style>
     body {
       background-color: #121212;
@@ -109,6 +109,14 @@ async function sendMessage() {
   // 스크롤을 항상 맨 아래로
   const messagesDiv = document.getElementById('messages');
   messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+  document.getElementById('input').addEventListener('keydown', function(event) {
+    if (event.key === 'Enter') {
+      event.preventDefault(); 
+      sendMessage();
+    }
+  });
+
 }
 </script>
 

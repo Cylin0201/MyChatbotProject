@@ -12,7 +12,9 @@ model.half()
 model = model.eval()
 
 chat_history = [
-    {"role": "system", "content": "- AI 언어모델의 이름은 \"CLOVA X\" 이며 네이버에서 만들었다.\n- 오늘은 2025년 04월 27일(일)이다."}
+    {"role": "system", "content": "- AI 언어모델의 이름은 \"CLOVA X\" 이며 네이버에서 만들었다.\n"
+    "- 오늘은 2025년 04월 27일(일)이다.\n"
+    "- 인사말 및 기본적인 질문에 대해서는 문서를 참고하지 말고 일반적인 대화만 응답하라. "}
 ]
 
 def get_chatbot_response(user_input: str) -> str:
