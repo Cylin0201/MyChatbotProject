@@ -1,5 +1,7 @@
+from app.retriever import retriever, load_disease_titles, is_disease_in_query
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
+from typing import List
 
 # 모델 및 토크나이저 로드
 model_name = "naver-hyperclovax/HyperCLOVAX-SEED-Text-Instruct-0.5B"
@@ -11,51 +13,76 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 model.half()
 model = model.eval()
 
-chat_history = [
-    {"role": "system", "content": "- AI 언어모델의 이름은 \"CLOVA X\" 이며 네이버에서 만들었다.\n"
-    "- 오늘은 2025년 04월 27일(일)이다.\n"
-    "- 인사말 및 기본적인 질문에 대해서는 문서를 참고하지 말고 일반적인 대화만 응답하라. "}
-]
+# 질환명 리스트 로드
+disease_titles = load_disease_titles("data/emergency.jsonl")
 
-def get_chatbot_response(user_input: str) -> str:
-    chat_history.append({"role": "user", "content": user_input})
+def build_prompt(user_input: str, retrieved_docs: List[dict]) -> List[dict]:
+    system_prompt = (
+        "- AI 언어모델의 이름은 \"CLOVA X\" 이며 네이버에서 만들었다.\n"
+        "- 오늘은 2025년 04월 29일(화)이다.\n"
+        "- 인사말 및 기본적인 질문에 대해서는 문서를 참고하지 말고 일반적인 대화만 응답하라.\n"
+        "- 사용자가 질문한 내용과 관련 있는 참고 문서를 아래에 제공하니, 가능한 그 정보를 반영해 답변하라.\n"
+    )
 
-    # 입력 텐서 생성
+    context_text = "\n\n".join([f"제목: {doc['title']}\n내용: {doc['content']}" for doc in retrieved_docs])
+
+    user_prompt = (
+        f"질문: {user_input}\n\n"
+        f"[참고 문서]\n{context_text}\n\n"
+        "위의 참고 문서를 근거로 답변해 주세요."
+    )
+
+    chat_history = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt}
+    ]
+
+    return chat_history
+
+def get_chatbot_response(user_input: str) -> dict:
+    used_reference = is_disease_in_query(user_input, disease_titles)
+
+    if used_reference:
+        relevant_docs = retriever.retrieve(user_input, top_k=3)
+        chat_history = build_prompt(user_input, relevant_docs)
+    else:
+        chat_history = [
+            {"role": "system", "content": "사용자가 일반적인 대화를 요청했습니다. 문서를 참조하지 마세요."},
+            {"role": "user", "content": user_input}
+        ]
+
     inputs = tokenizer.apply_chat_template(
         chat_history,
         add_generation_prompt=True,
         return_dict=True,
         return_tensors="pt",
-        padding=False,  # padding 안함
-        truncation=True # 너무 긴 이력 자름
+        padding=False,
+        truncation=True
     ).to(device)
 
-    # 모델 추론
     with torch.no_grad():
         output_ids = model.generate(
             **inputs,
-            max_new_tokens=256,
+            max_new_tokens=512,
             num_beams=1,
             do_sample=False,
-            temperature=1.0,
             top_k=50,
-            repetition_penalty=1.2,
+            repetition_penalty=1.1,
             eos_token_id=tokenizer.eos_token_id,
         )
 
-    # 디코딩
     decoded = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0]
-
-    # 'assistant' 이후 텍스트만 추출
     assistant_prefix = "assistant\n"
     if assistant_prefix in decoded:
-        response = decoded.split(assistant_prefix)[-1].strip()
+        response_text = decoded.split(assistant_prefix)[-1].strip()
     else:
-        response = decoded.strip()
+        response_text = decoded.strip()
 
-    # <|endofturn|>, <|stop|>, <|im_end|> 모두 제거
     for stop_token in ["<|endofturn|>", "<|stop|>", "<|im_end|>"]:
-        if stop_token in response:
-            response = response.split(stop_token)[0].strip()
+        if stop_token in response_text:
+            response_text = response_text.split(stop_token)[0].strip()
 
-    return response
+    return {
+        "response": response_text,
+        "reference_used": used_reference
+    }

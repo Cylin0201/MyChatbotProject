@@ -103,21 +103,32 @@ async function sendMessage() {
 
   const botDiv = document.createElement('div');
   botDiv.className = 'message bot';
-  botDiv.innerText = data.response;
+
+  // 수정된 부분: 응답 객체 처리
+  let text;
+  if (typeof data.response === 'object' && data.response.text) {
+    text = data.response.text;
+  } else if (typeof data.response === 'string') {
+    text = data.response;
+  } else {
+    text = JSON.stringify(data.response, null, 2);
+  }
+
+  botDiv.innerText = text;
   document.getElementById('messages').appendChild(botDiv);
 
   // 스크롤을 항상 맨 아래로
   const messagesDiv = document.getElementById('messages');
   messagesDiv.scrollTop = messagesDiv.scrollHeight;
-
-  document.getElementById('input').addEventListener('keydown', function(event) {
-    if (event.key === 'Enter') {
-      event.preventDefault(); 
-      sendMessage();
-    }
-  });
-
 }
+
+// 엔터로도 메시지 전송
+document.getElementById('input').addEventListener('keydown', function(event) {
+  if (event.key === 'Enter') {
+    event.preventDefault(); 
+    sendMessage();
+  }
+});
 </script>
 
 </body>

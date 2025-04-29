@@ -10,7 +10,7 @@ class Retriever:
     문서 로드 → 임베딩 → FAISS 인덱싱 → 검색 기능 제공
     """
     def __init__(self,
-                 doc_path: str = "data/emergency_docs.jsonl",
+                 doc_path: str = "data/emergency.jsonl",
                  idx_path: str = "data/faiss_index.idx",
                  meta_path: str = "data/docs_meta.pkl",
                  model_name: str = "sentence-transformers/all-MiniLM-L6-v2"):
@@ -18,16 +18,14 @@ class Retriever:
         self.idx_path = idx_path
         self.meta_path = meta_path
         self.model = SentenceTransformer(model_name)
-        # 인덱스와 문서 메타데이터는 로드 또는 빌드
+
         if os.path.exists(self.idx_path) and os.path.exists(self.meta_path):
             self._load_index()
         else:
             self._build_index()
 
     def _load_index(self):
-        # FAISS 인덱스 로드
         self.index = faiss.read_index(self.idx_path)
-        # 문서 메타데이터 로드
         with open(self.meta_path, 'rb') as f:
             self.documents = pickle.load(f)
         self.vector_dim = self.index.d
@@ -71,6 +69,23 @@ class Retriever:
         for idx in indices[0]:
             results.append(self.documents[idx])
         return results
+    
+
+
+def load_disease_titles(file_path="data/emergency.jsonl"):
+    disease_titles = []
+    with open(file_path, "r", encoding="utf-8") as f:
+        for line in f:
+            data = json.loads(line)
+            disease_titles.append(data["title"])
+    return disease_titles
+
+# 질환명이 질문에 포함되어 있는지 확인하는 함수
+def is_disease_in_query(query: str, disease_titles: list) -> bool:
+    # 질환명이 질문에 포함되어 있는지 확인
+    return any(disease.lower() in query.lower() for disease in disease_titles)
+
+
 
 # 전역 인스턴스 생성
 retriever = Retriever()
